@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://vindecoder.example.com/sitemap.xml
+
+# Crawl delay
+Crawl-delay: 1
+
+# Block access to build files
+Disallow: /assets/
+Disallow: /*.map$

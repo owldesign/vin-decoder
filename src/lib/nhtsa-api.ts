@@ -1,0 +1,148 @@
+export interface VehicleData {
+  Variable: string
+  Value: string
+  ValueId: string
+}
+
+export interface NHTSAResponse {
+  Count: number
+  Message: string
+  Results: VehicleData[]
+  SearchCriteria: string
+}
+
+export interface ProcessedVehicleData {
+  make?: string
+  model?: string
+  year?: string
+  bodyClass?: string
+  engineCylinders?: string
+  engineHP?: string
+  fuelType?: string
+  transmission?: string
+  driveType?: string
+  vehicleType?: string
+  manufacturerName?: string
+  plantCity?: string
+  plantCountry?: string
+  plantState?: string
+  series?: string
+  trim?: string
+  errorText?: string
+  possibleValues?: string
+}
+
+export class NHTSAApiService {
+  private static readonly BASE_URL = "https://vpic.nhtsa.dot.gov/api"
+
+  static async decodeVin(vin: string, year?: string): Promise<ProcessedVehicleData> {
+    try {
+      const url = year
+        ? `${this.BASE_URL}/vehicles/decodevin/${vin}?format=json&modelyear=${year}`
+        : `${this.BASE_URL}/vehicles/decodevin/${vin}?format=json`
+
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data: NHTSAResponse = await response.json()
+
+      return this.processVehicleData(data.Results)
+    } catch (error) {
+      console.error("Error fetching VIN data:", error)
+      throw new Error("Failed to decode VIN. Please check your connection and try again.")
+    }
+  }
+
+  private static processVehicleData(results: VehicleData[]): ProcessedVehicleData {
+    const processed: ProcessedVehicleData = {}
+
+    for (const item of results) {
+      const variable = item.Variable.toLowerCase()
+      const value = item.Value
+
+      // Skip empty values
+      if (!value || value === "Not Applicable" || value === "") continue
+
+      // Map NHTSA variables to our processed data structure
+      switch (variable) {
+        case "make":
+          processed.make = value
+          break
+        case "model":
+          processed.model = value
+          break
+        case "model year":
+          processed.year = value
+          break
+        case "body class":
+          processed.bodyClass = value
+          break
+        case "engine number of cylinders":
+          processed.engineCylinders = value
+          break
+        case "engine hp (from)":
+          processed.engineHP = value
+          break
+        case "fuel type - primary":
+          processed.fuelType = value
+          break
+        case "transmission style":
+          processed.transmission = value
+          break
+        case "drive type":
+          processed.driveType = value
+          break
+        case "vehicle type":
+          processed.vehicleType = value
+          break
+        case "manufacturer name":
+          processed.manufacturerName = value
+          break
+        case "plant city":
+          processed.plantCity = value
+          break
+        case "plant country":
+          processed.plantCountry = value
+          break
+        case "plant state":
+          processed.plantState = value
+          break
+        case "series":
+          processed.series = value
+          break
+        case "trim":
+          processed.trim = value
+          break
+        case "error text":
+          // Only treat actual error messages as errors, not informational messages
+          if (value && !value.toLowerCase().includes("decoded clean") && !value.toLowerCase().includes("check digit") && value.toLowerCase().includes("error")) {
+            processed.errorText = value
+          }
+          break
+        case "possible values":
+          processed.possibleValues = value
+          break
+      }
+    }
+
+    return processed
+  }
+
+  static async getManufacturers(): Promise<{id: string, name: string}[]> {
+    try {
+      const response = await fetch(`${this.BASE_URL}/vehicles/getallmanufacturers?format=json`)
+      const data = await response.json()
+
+      return data.Results.map((item: any) => ({
+        id: item.Mfr_ID,
+        name: item.Mfr_Name
+      }))
+    } catch (error) {
+      console.error("Error fetching manufacturers:", error)
+      return []
+    }
+  }
+}
