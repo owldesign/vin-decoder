@@ -1,0 +1,28 @@
+# Deploys on push to main via the owl-tools runner on CT 105 (192.168.88.21).
+# The runner IS the guest — rsync is local into the vhost root.
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, owl-tools]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+      - name: Publish
+        run: |
+          rsync -a --delete dist/ /var/www/vin/
