@@ -6,14 +6,18 @@ interface VehicleResultsNewProps {
   data: ProcessedVehicleData
   vin: string
   onDecodeNext: () => void
+  onDecodeAnother: () => void
   isSample: boolean
 }
 
-export function VehicleResultsNew({ data, vin, onDecodeNext, isSample }: VehicleResultsNewProps) {
+export function VehicleResultsNew({ data, vin, onDecodeNext, onDecodeAnother, isSample }: VehicleResultsNewProps) {
   const formatEngine = () => {
     const parts = []
     if (data.engineDisplacement) parts.push(`${data.engineDisplacement}L`)
-    if (data.engineCylinders) parts.push(`V${data.engineCylinders}`)
+    if (data.engineCylinders) {
+      const cylCount = data.engineCylinders
+      parts.push(`${cylCount}-cyl`)
+    }
     if (data.engineModel) parts.push(data.engineModel)
     return parts.join(' ') || undefined
   }
@@ -66,13 +70,21 @@ export function VehicleResultsNew({ data, vin, onDecodeNext, isSample }: Vehicle
               ))}
             </div>
 
-            <div className="flex justify-center pt-4">
+            <div className="flex justify-center gap-3 pt-4">
               <button
-                onClick={onDecodeNext}
-                className="bg-[#111111] text-white px-8 py-3 rounded font-semibold hover:bg-neutral-800 transition-colors uppercase tracking-wide text-sm"
+                onClick={onDecodeAnother}
+                className="bg-white text-neutral-900 px-6 py-3 rounded font-semibold hover:bg-neutral-100 transition-colors uppercase tracking-wide text-sm border-2 border-neutral-800"
               >
-                DECODE NEXT SAMPLE
+                DECODE ANOTHER VIN
               </button>
+              {isSample && (
+                <button
+                  onClick={onDecodeNext}
+                  className="bg-[#111111] text-white px-6 py-3 rounded font-semibold hover:bg-neutral-800 transition-colors uppercase tracking-wide text-sm"
+                >
+                  NEXT SAMPLE
+                </button>
+              )}
             </div>
 
             <div className="flex flex-col items-center space-y-2 pt-4 border-t border-neutral-300">

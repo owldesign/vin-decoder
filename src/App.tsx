@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { VehicleResultsNew } from '@/components/vehicle-results-new'
+import { VinInputCard } from '@/components/vin-input-card'
 import { NHTSAApiService, type ProcessedVehicleData } from '@/lib/nhtsa-api'
 import { GoogleAnalytics } from '@next/third-parties/google'
 
@@ -19,13 +20,14 @@ function App() {
   const [currentSampleIndex, setCurrentSampleIndex] = useState(0)
   const [isSample, setIsSample] = useState(false)
 
-  const handleVinSubmit = async (vin: string, year?: string) => {
+  const handleVinSubmit = async (vin: string, fromSample: boolean = false) => {
     setLoading(true)
     setError(null)
     setVehicleData(null)
+    setIsSample(fromSample)
 
     try {
-      const data = await NHTSAApiService.decodeVin(vin, year)
+      const data = await NHTSAApiService.decodeVin(vin)
       setVehicleData(data)
       setCurrentVin(vin)
     } catch (err) {
@@ -38,61 +40,44 @@ function App() {
   const handleDecodeNextSample = async () => {
     const nextIndex = (currentSampleIndex + 1) % SAMPLE_VINS.length
     setCurrentSampleIndex(nextIndex)
-    setIsSample(true)
-    await handleVinSubmit(SAMPLE_VINS[nextIndex])
+    await handleVinSubmit(SAMPLE_VINS[nextIndex], true)
   }
 
-  const handleDecodeSample = async (index: number) => {
-    setCurrentSampleIndex(index)
-    setIsSample(true)
-    await handleVinSubmit(SAMPLE_VINS[index])
+  const handleDecodeSample = async (vin: string) => {
+    const index = SAMPLE_VINS.indexOf(vin)
+    if (index !== -1) {
+      setCurrentSampleIndex(index)
+    }
+    await handleVinSubmit(vin, true)
   }
 
-  const showWelcome = !vehicleData && !loading && !error
+  const handleDecodeAnother = () => {
+    setVehicleData(null)
+    setCurrentVin('')
+    setError(null)
+    setIsSample(false)
+  }
+
+  const showInput = !vehicleData && !error
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4 py-8">
       <div className="w-full max-w-4xl">
-        {showWelcome && (
-          <div className="text-center space-y-8">
-            <div className="space-y-4">
-              <h1 className="text-4xl md:text-5xl font-bold text-white">VIN Decoder</h1>
-              <p className="text-neutral-400 text-lg">
-                Decode any vehicle identification number using official NHTSA data
-              </p>
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-3">
-              {SAMPLE_VINS.map((vin, index) => (
-                <button
-                  key={vin}
-                  onClick={() => handleDecodeSample(index)}
-                  className="px-4 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 transition-colors text-sm font-mono"
-                >
-                  {vin}
-                </button>
-              ))}
-            </div>
-
-            <div className="pt-4">
-              <p className="text-neutral-500 text-sm">Click any sample VIN above to see it decoded</p>
-            </div>
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-neutral-700 border-t-white"></div>
-            <p className="text-white">Decoding VIN...</p>
-          </div>
+        {showInput && (
+          <VinInputCard
+            onSubmit={(vin) => handleVinSubmit(vin, false)}
+            loading={loading}
+            onSampleClick={handleDecodeSample}
+            samples={SAMPLE_VINS}
+          />
         )}
 
         {error && (
           <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 text-center">
-            <p className="text-red-400">{error}</p>
+            <p className="text-red-400 mb-4">{error}</p>
             <button
-              onClick={() => setError(null)}
-              className="mt-4 px-6 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 transition-colors"
+              onClick={handleDecodeAnother}
+              className="px-6 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 transition-colors"
             >
               Try Again
             </button>
@@ -104,6 +89,7 @@ function App() {
             data={vehicleData}
             vin={currentVin}
             onDecodeNext={handleDecodeNextSample}
+            onDecodeAnother={handleDecodeAnother}
             isSample={isSample}
           />
         )}
