@@ -1,179 +1,116 @@
-import {useState} from 'react'
-import {ThemeProvider} from '@/components/theme-provider'
-import {ThemeToggle} from '@/components/theme-toggle'
-import {VinForm} from '@/components/vin-form'
-import {VehicleResults} from '@/components/vehicle-results'
-import {NHTSAApiService, type ProcessedVehicleData} from '@/lib/nhtsa-api'
-import {Card, CardContent} from '@/components/ui/card'
-import {AlertCircle, RotateCcw} from 'lucide-react'
-import {Button} from '@/components/ui/button'
-import {GoogleAnalytics} from '@next/third-parties/google';
+import { useState } from 'react'
+import { VehicleResultsNew } from '@/components/vehicle-results-new'
+import { NHTSAApiService, type ProcessedVehicleData } from '@/lib/nhtsa-api'
+import { GoogleAnalytics } from '@next/third-parties/google'
+
+const SAMPLE_VINS = [
+  '1FTFW1ET5DFC10312', // 2013 Ford F-150 SuperCrew
+  '1HGBH41JXMN109186', // 2021 Honda Accord
+  '5YJSA1E14HF208682', // 2017 Tesla Model S
+  'WBA3A5G59DNP26082', // 2013 BMW 328i
+  '1G1YY23W9R5119845', // 1994 Chevrolet Corvette
+]
 
 function App() {
-    const [vehicleData, setVehicleData] = useState<ProcessedVehicleData | null>(null)
-    const [currentVin, setCurrentVin] = useState<string>("")
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+  const [vehicleData, setVehicleData] = useState<ProcessedVehicleData | null>(null)
+  const [currentVin, setCurrentVin] = useState<string>('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [currentSampleIndex, setCurrentSampleIndex] = useState(0)
+  const [isSample, setIsSample] = useState(false)
 
-    const handleVinSubmit = async (vin: string, year?: string) => {
-        setLoading(true)
-        setError(null)
-        setVehicleData(null)
+  const handleVinSubmit = async (vin: string, year?: string) => {
+    setLoading(true)
+    setError(null)
+    setVehicleData(null)
 
-        try {
-            const data = await NHTSAApiService.decodeVin(vin, year)
-            setVehicleData(data)
-            setCurrentVin(vin)
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An unknown error occurred')
-        } finally {
-            setLoading(false)
-        }
+    try {
+      const data = await NHTSAApiService.decodeVin(vin, year)
+      setVehicleData(data)
+      setCurrentVin(vin)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred')
+    } finally {
+      setLoading(false)
     }
+  }
 
-    const handleReset = () => {
-        setVehicleData(null)
-        setCurrentVin("")
-        setError(null)
-    }
+  const handleDecodeNextSample = async () => {
+    const nextIndex = (currentSampleIndex + 1) % SAMPLE_VINS.length
+    setCurrentSampleIndex(nextIndex)
+    setIsSample(true)
+    await handleVinSubmit(SAMPLE_VINS[nextIndex])
+  }
 
-    return (
-        <div>
-            <ThemeProvider defaultTheme="dark" storageKey="vin-decoder-theme">
-                <div className="min-h-screen bg-background relative">
-                    <header className="container mx-auto px-4 py-6">
-                        <div className="flex justify-between items-start mb-6">
-                            <div className="flex-1"></div>
-                            <div className="text-center flex-1">
-                                <h1 className="text-4xl font-bold mb-2">VIN Decoder</h1>
-                                <p className="text-lg text-muted-foreground">
-                                    Free Vehicle Identification Number Lookup Tool
-                                </p>
-                            </div>
-                            <div className="flex-1 flex justify-end">
-                                <ThemeToggle/>
-                            </div>
-                        </div>
-                        <div className="text-center">
-                            <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
-                                Decode any 17-character VIN instantly using official NHTSA data. Get comprehensive vehicle specifications,
-                                manufacturing details, and technical information for any car, truck, or motorcycle manufactured since 1981.
-                            </p>
-                        </div>
-                    </header>
+  const handleDecodeSample = async (index: number) => {
+    setCurrentSampleIndex(index)
+    setIsSample(true)
+    await handleVinSubmit(SAMPLE_VINS[index])
+  }
 
-                    <main className="container mx-auto px-4 py-8">
-                        <div className="flex flex-col items-center space-y-8">
-                            {!vehicleData && !error && (
-                                <section aria-labelledby="vin-form-heading">
-                                    <h2 id="vin-form-heading" className="sr-only">VIN Input Form</h2>
-                                    <VinForm onSubmit={handleVinSubmit} loading={loading}/>
-                                </section>
-                            )}
+  const showWelcome = !vehicleData && !loading && !error
 
-                            {error && (
-                                <section aria-labelledby="error-heading">
-                                    <h2 id="error-heading" className="sr-only">Error Message</h2>
-                                    <Card className="w-full max-w-md border-destructive">
-                                        <CardContent className="pt-6">
-                                            <div className="flex items-center gap-2 text-destructive mb-4">
-                                                <AlertCircle className="h-5 w-5"/>
-                                                <span className="font-medium">Error</span>
-                                            </div>
-                                            <p className="text-sm mb-4">{error}</p>
-                                            <Button onClick={handleReset} variant="outline" className="w-full">
-                                                <RotateCcw className="mr-2 h-4 w-4"/>
-                                                Try Again
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                </section>
-                            )}
+  return (
+    <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl">
+        {showWelcome && (
+          <div className="text-center space-y-8">
+            <div className="space-y-4">
+              <h1 className="text-4xl md:text-5xl font-bold text-white">VIN Decoder</h1>
+              <p className="text-neutral-400 text-lg">
+                Decode any vehicle identification number using official NHTSA data
+              </p>
+            </div>
 
-                            {vehicleData && (
-                                <section aria-labelledby="results-heading">
-                                    <h2 id="results-heading" className="sr-only">Vehicle Information Results</h2>
-                                    <div className="w-full space-y-6">
-                                        <div className="flex justify-center">
-                                            <Button onClick={handleReset} variant="outline">
-                                                <RotateCcw className="mr-2 h-4 w-4"/>
-                                                Decode Another VIN
-                                            </Button>
-                                        </div>
-                                        <div className="flex justify-center">
-                                            <VehicleResults data={vehicleData} vin={currentVin}/>
-                                        </div>
-                                    </div>
-                                </section>
-                            )}
-                        </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              {SAMPLE_VINS.map((vin, index) => (
+                <button
+                  key={vin}
+                  onClick={() => handleDecodeSample(index)}
+                  className="px-4 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 transition-colors text-sm font-mono"
+                >
+                  {vin}
+                </button>
+              ))}
+            </div>
 
-                        <section className="mt-16 max-w-4xl mx-auto">
-                            <h2 className="text-2xl font-semibold mb-6 text-center">About VIN Decoding</h2>
-                            <div className="grid md:grid-cols-2 gap-8">
-                                <div>
-                                    <h3 className="text-lg font-medium mb-3">What is a VIN?</h3>
-                                    <p className="text-muted-foreground">
-                                        A Vehicle Identification Number (VIN) is a unique 17-character code assigned to every
-                                        vehicle manufactured since 1981. It contains encoded information about the vehicle's
-                                        make, model, year, engine, and manufacturing plant.
-                                    </p>
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-medium mb-3">How to Find Your VIN</h3>
-                                    <p className="text-muted-foreground">
-                                        Your VIN can be found on the dashboard near the windshield (driver's side),
-                                        driver's door jamb, vehicle registration, or insurance documents. It's a
-                                        17-character code with no spaces or special characters.
-                                    </p>
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-medium mb-3">Official NHTSA Data</h3>
-                                    <p className="text-muted-foreground">
-                                        Our tool uses the official NHTSA (National Highway Traffic Safety Administration)
-                                        vPIC database, ensuring accurate and up-to-date vehicle information directly
-                                        from government sources.
-                                    </p>
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-medium mb-3">Free & Fast</h3>
-                                    <p className="text-muted-foreground">
-                                        Decode unlimited VINs completely free. No registration, no hidden fees,
-                                        no limits. Get instant results with detailed vehicle specifications,
-                                        manufacturing info, and safety ratings.
-                                    </p>
-                                </div>
-                            </div>
-                        </section>
-                    </main>
+            <div className="pt-4">
+              <p className="text-neutral-500 text-sm">Click any sample VIN above to see it decoded</p>
+            </div>
+          </div>
+        )}
 
-                    <footer className="border-t mt-16">
-                        <div className="container mx-auto px-4 py-6">
-                            <div className="text-center text-sm text-muted-foreground space-y-2">
-                                <p>
-                                    Vehicle data provided by{' '}
-                                    <a
-                                        href="https://vpic.nhtsa.dot.gov/api/"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="underline hover:text-foreground"
-                                        title="NHTSA vPIC API - Official Vehicle Database"
-                                    >
-                                        NHTSA vPIC API
-                                    </a>
-                                </p>
-                                <p>
-                                    Free VIN decoder tool for cars, trucks, motorcycles, and commercial vehicles.
-                                    Fast, accurate, and always up-to-date.
-                                </p>
-                            </div>
-                        </div>
-                    </footer>
-                </div>
-            </ThemeProvider>
-            <GoogleAnalytics gaId="G-L560QKP7ZF"/>
-        </div>
-    )
+        {loading && (
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-neutral-700 border-t-white"></div>
+            <p className="text-white">Decoding VIN...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 text-center">
+            <p className="text-red-400">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="mt-4 px-6 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {vehicleData && (
+          <VehicleResultsNew
+            data={vehicleData}
+            vin={currentVin}
+            onDecodeNext={handleDecodeNextSample}
+            isSample={isSample}
+          />
+        )}
+      </div>
+      <GoogleAnalytics gaId="G-L560QKP7ZF" />
+    </div>
+  )
 }
 
 export default App
