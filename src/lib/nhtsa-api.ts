@@ -200,10 +200,18 @@ export const formatModel = (data: ProcessedVehicleData): string =>
   [data.model, data.series].filter(Boolean).join(" ")
 
 export const formatBodyClass = (data: ProcessedVehicleData): string => {
-  const cab = data.cabType
-    ? `${titleCaseSafe(data.cabType.replace(/\s*cab$/i, ""))} Cab`
-    : ""
+  if (!data.cabType) return data.bodyClass || ""
+  const cab = formatCabType(data.cabType)
   return [data.bodyClass, cab].filter(Boolean).join(" — ")
+}
+
+const formatCabType = (cabType: string): string => {
+  const lower = cabType.toLowerCase()
+  if (lower.includes("crew")) return "Crew Cab"
+  if (lower.includes("super cab") || lower.includes("extended")) return "Super Cab"
+  if (lower.includes("regular")) return "Regular Cab"
+  const first = cabType.split("/")[0].trim().replace(/\s*cab$/i, "")
+  return `${titleCaseSafe(first)} Cab`
 }
 
 export const formatDriveType = (data: ProcessedVehicleData): string =>
