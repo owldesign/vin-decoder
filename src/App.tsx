@@ -10,7 +10,6 @@ import {
   cleanVin,
   isCompleteVin,
   loadHistory,
-  SAMPLE_VINS,
   saveHistory,
   type HistoryItem,
 } from "@/lib/vin-utils"
@@ -20,9 +19,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<ProcessedVehicleData | null>(null)
-  const [isSample, setIsSample] = useState(false)
   const [decodedAt, setDecodedAt] = useState("")
-  const [sampleIndex, setSampleIndex] = useState(0)
   const [history, setHistory] = useState<HistoryItem[]>([])
   const lastDecodedRef = useRef<string>("")
 
@@ -35,11 +32,11 @@ function App() {
     setVin(next)
     setError(null)
     if (isCompleteVin(next) && next !== lastDecodedRef.current) {
-      handleDecode(next, false)
+      handleDecode(next)
     }
   }
 
-  const handleDecode = async (vinArg?: string, fromSample = false) => {
+  const handleDecode = async (vinArg?: string) => {
     const nextVin = cleanVin(vinArg ?? vin)
     if (!isCompleteVin(nextVin)) {
       setError("NEEDS 17 VALID CHARACTERS (NO I, O, Q)")
@@ -50,7 +47,6 @@ function App() {
     setVin(nextVin)
     setLoading(true)
     setError(null)
-    setIsSample(fromSample)
 
     try {
       const decoded = await NHTSAApiService.decodeVin(nextVin)
@@ -81,24 +77,11 @@ function App() {
     setVin("")
     setData(null)
     setError(null)
-    setIsSample(false)
     setDecodedAt("")
   }
 
-  const handleNextSample = () => {
-    const nextIndex = (sampleIndex + 1) % SAMPLE_VINS.length
-    setSampleIndex(nextIndex)
-    handleDecode(SAMPLE_VINS[nextIndex], true)
-  }
-
-  const handleSampleClick = (sampleVin: string) => {
-    const index = SAMPLE_VINS.indexOf(sampleVin as (typeof SAMPLE_VINS)[number])
-    if (index !== -1) setSampleIndex(index)
-    handleDecode(sampleVin, true)
-  }
-
   const handleHistoryLoad = (historyVin: string) => {
-    handleDecode(historyVin, false)
+    handleDecode(historyVin)
   }
 
   const handleHistoryRemove = (historyVin: string) => {
@@ -112,14 +95,11 @@ function App() {
       <IdentificationCard
         vin={vin}
         onVinChange={handleVinChange}
-        onDecode={() => handleDecode(vin, false)}
+        onDecode={() => handleDecode(vin)}
         onClear={handleClear}
-        onNextSample={handleNextSample}
-        onSampleClick={handleSampleClick}
         loading={loading}
         error={error}
         data={data}
-        isSample={isSample}
         decodedAt={decodedAt}
         history={history}
         onHistoryLoad={handleHistoryLoad}

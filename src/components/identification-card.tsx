@@ -10,19 +10,16 @@ import {
   formatVehicleClass,
   type ProcessedVehicleData,
 } from "@/lib/nhtsa-api"
-import { SAMPLE_VINS, type HistoryItem } from "@/lib/vin-utils"
+import { type HistoryItem } from "@/lib/vin-utils"
 
 interface IdentificationCardProps {
   vin: string
   onVinChange: (vin: string) => void
   onDecode: () => void
   onClear: () => void
-  onNextSample: () => void
-  onSampleClick: (vin: string) => void
   loading: boolean
   error: string | null
   data: ProcessedVehicleData | null
-  isSample: boolean
   decodedAt: string
   history: HistoryItem[]
   onHistoryLoad: (vin: string) => void
@@ -41,12 +38,9 @@ export const IdentificationCard = ({
   onVinChange,
   onDecode,
   onClear,
-  onNextSample,
-  onSampleClick,
   loading,
   error,
   data,
-  isSample,
   decodedAt,
   history,
   onHistoryLoad,
@@ -77,11 +71,9 @@ export const IdentificationCard = ({
         ? "AWAITING VIN · 17 CHARACTERS"
         : `${vin.length} OF 17 CHARACTERS`
 
-  const footnote = isSample
-    ? "SAMPLE DATA — THE LIVE APP DECODES ANY VIN VIA NHTSA VPIC"
-    : hasDecode
-      ? `DECODED VIA NHTSA VPIC · ${decodedAt} · FIELDS RETURNED: ${data?.allFields.length ?? 0}`
-      : "LIVE DECODE VIA NHTSA VPIC · NO KEY REQUIRED"
+  const footnote = hasDecode
+    ? `DECODED VIA NHTSA VPIC · ${decodedAt} · FIELDS RETURNED: ${data?.allFields.length ?? 0}`
+    : "LIVE DECODE VIA NHTSA VPIC · NO KEY REQUIRED"
 
   const filteredFields = useMemo(() => {
     const query = filter.toLowerCase()
@@ -204,7 +196,7 @@ export const IdentificationCard = ({
                 value={vin}
                 onChange={handleFieldChange}
                 onKeyDown={handleFieldKeyDown}
-                placeholder="1FTFW1ET5DFC10312"
+                placeholder="PASTE VIN"
                 autoComplete="off"
                 spellCheck={false}
                 maxLength={17}
@@ -252,34 +244,6 @@ export const IdentificationCard = ({
                   {spec.value}
                 </span>
               </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-[18px]">
-            <button
-              type="button"
-              onClick={onNextSample}
-              disabled={loading}
-              className="min-h-[52px] bg-[#111] px-7 py-[17px] font-mono text-[13.5px] uppercase tracking-[0.14em] text-white hover:bg-[#2b2b2b]"
-            >
-              DECODE NEXT SAMPLE ▸
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="font-mono text-[11.5px] tracking-[0.16em] text-[#6f6c63]">
-              SAMPLES
-            </span>
-            {SAMPLE_VINS.map((sampleVin) => (
-              <button
-                key={sampleVin}
-                type="button"
-                onClick={() => onSampleClick(sampleVin)}
-                disabled={loading}
-                className="bg-[#e5e3dc] px-[11px] py-[9px] font-mono text-[11.5px] text-[#4a4740] hover:bg-[#111] hover:text-white disabled:opacity-60"
-              >
-                {sampleVin}
-              </button>
             ))}
           </div>
 
