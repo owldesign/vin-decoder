@@ -18,6 +18,8 @@ export interface ProcessedVehicleData {
   bodyClass?: string
   engineCylinders?: string
   engineHP?: string
+  engineDisplacement?: string
+  engineModel?: string
   fuelType?: string
   transmission?: string
   driveType?: string
@@ -85,6 +87,12 @@ export class NHTSAApiService {
           break
         case "engine hp (from)":
           processed.engineHP = value
+          break
+        case "displacement (l)":
+          processed.engineDisplacement = value
+          break
+        case "engine model":
+          processed.engineModel = value
           break
         case "fuel type - primary":
           processed.fuelType = value
