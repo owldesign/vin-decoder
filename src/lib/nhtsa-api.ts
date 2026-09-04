@@ -11,15 +11,22 @@ export interface NHTSAResponse {
   SearchCriteria: string
 }
 
+export interface VinField {
+  label: string
+  value: string
+}
+
 export interface ProcessedVehicleData {
   make?: string
   model?: string
   year?: string
   bodyClass?: string
+  cabType?: string
   engineCylinders?: string
   engineHP?: string
   engineDisplacement?: string
   engineModel?: string
+  engineConfiguration?: string
   fuelType?: string
   transmission?: string
   driveType?: string
@@ -32,7 +39,11 @@ export interface ProcessedVehicleData {
   trim?: string
   errorText?: string
   possibleValues?: string
+  allFields: VinField[]
 }
+
+const skipValue = (value: string | undefined): boolean =>
+  !value || value === "Not Applicable" || value === "0"
 
 export class NHTSAApiService {
   private static readonly BASE_URL = "https://vpic.nhtsa.dot.gov/api"
@@ -46,29 +57,31 @@ export class NHTSAApiService {
       const response = await fetch(url)
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`NHTSA VPIC UNREACHABLE — CHECK THE CONNECTION`)
       }
 
       const data: NHTSAResponse = await response.json()
-
       return this.processVehicleData(data.Results)
     } catch (error) {
       console.error("Error fetching VIN data:", error)
-      throw new Error("Failed to decode VIN. Please check your connection and try again.")
+      throw new Error("NHTSA VPIC UNREACHABLE — CHECK THE CONNECTION")
     }
   }
 
   private static processVehicleData(results: VehicleData[]): ProcessedVehicleData {
-    const processed: ProcessedVehicleData = {}
+    const processed: ProcessedVehicleData = { allFields: [] }
 
     for (const item of results) {
-      const variable = item.Variable.toLowerCase()
-      const value = item.Value
+      const variable = (item.Variable || "").toLowerCase()
+      const value = (item.Value || "").trim()
 
-      // Skip empty values
-      if (!value || value === "Not Applicable" || value === "") continue
+      if (skipValue(value)) continue
 
-      // Map NHTSA variables to our processed data structure
+      processed.allFields.push({
+        label: (item.Variable || "").toUpperCase(),
+        value,
+      })
+
       switch (variable) {
         case "make":
           processed.make = value
@@ -82,6 +95,9 @@ export class NHTSAApiService {
         case "body class":
           processed.bodyClass = value
           break
+        case "cab type":
+          processed.cabType = value
+          break
         case "engine number of cylinders":
           processed.engineCylinders = value
           break
@@ -93,6 +109,9 @@ export class NHTSAApiService {
           break
         case "engine model":
           processed.engineModel = value
+          break
+        case "engine configuration":
+          processed.engineConfiguration = value
           break
         case "fuel type - primary":
           processed.fuelType = value
@@ -125,8 +144,12 @@ export class NHTSAApiService {
           processed.trim = value
           break
         case "error text":
-          // Only treat actual error messages as errors, not informational messages
-          if (value && !value.toLowerCase().includes("decoded clean") && !value.toLowerCase().includes("check digit") && value.toLowerCase().includes("error")) {
+          if (
+            value &&
+            !value.toLowerCase().includes("decoded clean") &&
+            !value.toLowerCase().includes("check digit") &&
+            value.toLowerCase().includes("error")
+          ) {
             processed.errorText = value
           }
           break
@@ -138,19 +161,64 @@ export class NHTSAApiService {
 
     return processed
   }
+}
 
-  static async getManufacturers(): Promise<{id: string, name: string}[]> {
-    try {
-      const response = await fetch(`${this.BASE_URL}/vehicles/getallmanufacturers?format=json`)
-      const data = await response.json()
+export const formatEngine = (data: ProcessedVehicleData): string => {
+  const parts: string[] = []
+  const displacement = parseFloat(data.engineDisplacement || "")
+  if (!Number.isNaN(displacement)) {
+    parts.push(`${displacement.toFixed(1)}L`)
+  }
 
-      return data.Results.map((item: any) => ({
-        id: item.Mfr_ID,
-        name: item.Mfr_Name
-      }))
-    } catch (error) {
-      console.error("Error fetching manufacturers:", error)
-      return []
+  const cylinders = data.engineCylinders
+  const configuration = (data.engineConfiguration || "").toLowerCase()
+  if (cylinders) {
+    if (configuration.startsWith("v") || configuration.includes("v-")) {
+      parts.push(`V${cylinders}`)
+    } else if (configuration.includes("in-line") || configuration.includes("inline")) {
+      parts.push(`I${cylinders}`)
+    } else {
+      parts.push(`${cylinders}-cyl`)
     }
   }
+
+  if (data.engineModel) parts.push(data.engineModel)
+  return parts.join(" ")
 }
+
+export const formatPlant = (data: ProcessedVehicleData): string => {
+  const city = data.plantCity ? titleCaseSafe(data.plantCity) : ""
+  const state = data.plantState
+    ? titleCaseSafe(data.plantState)
+    : data.plantCountry && data.plantCountry !== "UNITED STATES (USA)" && data.plantCountry !== "UNITED STATES"
+      ? titleCaseSafe(data.plantCountry)
+      : ""
+  return [city, state].filter(Boolean).join(", ")
+}
+
+export const formatModel = (data: ProcessedVehicleData): string =>
+  [data.model, data.series].filter(Boolean).join(" ")
+
+export const formatBodyClass = (data: ProcessedVehicleData): string => {
+  if (!data.cabType) return data.bodyClass || ""
+  const cab = formatCabType(data.cabType)
+  return [data.bodyClass, cab].filter(Boolean).join(" — ")
+}
+
+const formatCabType = (cabType: string): string => {
+  const lower = cabType.toLowerCase()
+  if (lower.includes("crew")) return "Crew Cab"
+  if (lower.includes("super cab") || lower.includes("extended")) return "Super Cab"
+  if (lower.includes("regular")) return "Regular Cab"
+  const first = cabType.split("/")[0].trim().replace(/\s*cab$/i, "")
+  return `${titleCaseSafe(first)} Cab`
+}
+
+export const formatDriveType = (data: ProcessedVehicleData): string =>
+  (data.driveType || "").split("/")[0] || ""
+
+export const formatVehicleClass = (data: ProcessedVehicleData): string =>
+  data.vehicleType ? titleCaseSafe(data.vehicleType) : ""
+
+const titleCaseSafe = (value: string): string =>
+  value.toLowerCase().replace(/\b[a-z]/g, (match) => match.toUpperCase())
