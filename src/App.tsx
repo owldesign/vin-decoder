@@ -1,99 +1,130 @@
-import { useState } from 'react'
-import { VehicleResultsNew } from '@/components/vehicle-results-new'
-import { VinInputCard } from '@/components/vin-input-card'
-import { NHTSAApiService, type ProcessedVehicleData } from '@/lib/nhtsa-api'
-import { GoogleAnalytics } from '@next/third-parties/google'
-
-const SAMPLE_VINS = [
-  '1FTFW1ET5DFC10312', // 2013 Ford F-150 SuperCrew
-  '1HGBH41JXMN109186', // 2021 Honda Accord
-  '5YJSA1E14HF208682', // 2017 Tesla Model S
-  'WBA3A5G59DNP26082', // 2013 BMW 328i
-  '1G1YY23W9R5119845', // 1994 Chevrolet Corvette
-]
+import { useEffect, useRef, useState } from "react"
+import { GoogleAnalytics } from "@next/third-parties/google"
+import { IdentificationCard } from "@/components/identification-card"
+import {
+  formatModel,
+  NHTSAApiService,
+  type ProcessedVehicleData,
+} from "@/lib/nhtsa-api"
+import {
+  cleanVin,
+  isCompleteVin,
+  loadHistory,
+  SAMPLE_VINS,
+  saveHistory,
+  type HistoryItem,
+} from "@/lib/vin-utils"
 
 function App() {
-  const [vehicleData, setVehicleData] = useState<ProcessedVehicleData | null>(null)
-  const [currentVin, setCurrentVin] = useState<string>('')
+  const [vin, setVin] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [currentSampleIndex, setCurrentSampleIndex] = useState(0)
+  const [data, setData] = useState<ProcessedVehicleData | null>(null)
   const [isSample, setIsSample] = useState(false)
+  const [decodedAt, setDecodedAt] = useState("")
+  const [sampleIndex, setSampleIndex] = useState(0)
+  const [history, setHistory] = useState<HistoryItem[]>([])
+  const lastDecodedRef = useRef<string>("")
 
-  const handleVinSubmit = async (vin: string, fromSample: boolean = false) => {
+  useEffect(() => {
+    setHistory(loadHistory())
+  }, [])
+
+  const handleVinChange = (nextRaw: string) => {
+    const next = cleanVin(nextRaw)
+    setVin(next)
+    setError(null)
+    if (isCompleteVin(next) && next !== lastDecodedRef.current) {
+      handleDecode(next, false)
+    }
+  }
+
+  const handleDecode = async (vinArg?: string, fromSample = false) => {
+    const nextVin = cleanVin(vinArg ?? vin)
+    if (!isCompleteVin(nextVin)) {
+      setError("NEEDS 17 VALID CHARACTERS (NO I, O, Q)")
+      return
+    }
+
+    lastDecodedRef.current = nextVin
+    setVin(nextVin)
     setLoading(true)
     setError(null)
-    setVehicleData(null)
     setIsSample(fromSample)
 
     try {
-      const data = await NHTSAApiService.decodeVin(vin)
-      setVehicleData(data)
-      setCurrentVin(vin)
+      const decoded = await NHTSAApiService.decodeVin(nextVin)
+      const stamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      setData(decoded)
+      setDecodedAt(stamp)
+
+      if (!decoded.make && !decoded.model) {
+        setError("NO VEHICLE RECORD RETURNED FOR THIS VIN")
+        return
+      }
+
+      const label = [decoded.year, decoded.make, formatModel(decoded)].filter(Boolean).join(" ")
+      setHistory((current) => {
+        const nextHistory = [{ vin: nextVin, label }, ...current.filter((item) => item.vin !== nextVin)].slice(0, 8)
+        saveHistory(nextHistory)
+        return nextHistory
+      })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred')
+      setError(err instanceof Error ? err.message : "NHTSA VPIC UNREACHABLE — CHECK THE CONNECTION")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDecodeNextSample = async () => {
-    const nextIndex = (currentSampleIndex + 1) % SAMPLE_VINS.length
-    setCurrentSampleIndex(nextIndex)
-    await handleVinSubmit(SAMPLE_VINS[nextIndex], true)
-  }
-
-  const handleDecodeSample = async (vin: string) => {
-    const index = SAMPLE_VINS.indexOf(vin)
-    if (index !== -1) {
-      setCurrentSampleIndex(index)
-    }
-    await handleVinSubmit(vin, true)
-  }
-
-  const handleDecodeAnother = () => {
-    setVehicleData(null)
-    setCurrentVin('')
+  const handleClear = () => {
+    lastDecodedRef.current = ""
+    setVin("")
+    setData(null)
     setError(null)
     setIsSample(false)
+    setDecodedAt("")
   }
 
-  const showInput = !vehicleData && !error
+  const handleNextSample = () => {
+    const nextIndex = (sampleIndex + 1) % SAMPLE_VINS.length
+    setSampleIndex(nextIndex)
+    handleDecode(SAMPLE_VINS[nextIndex], true)
+  }
+
+  const handleSampleClick = (sampleVin: string) => {
+    const index = SAMPLE_VINS.indexOf(sampleVin as (typeof SAMPLE_VINS)[number])
+    if (index !== -1) setSampleIndex(index)
+    handleDecode(sampleVin, true)
+  }
+
+  const handleHistoryLoad = (historyVin: string) => {
+    handleDecode(historyVin, false)
+  }
+
+  const handleHistoryRemove = (historyVin: string) => {
+    const nextHistory = history.filter((item) => item.vin !== historyVin)
+    setHistory(nextHistory)
+    saveHistory(nextHistory)
+  }
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] flex items-center justify-center p-4 py-8">
-      <div className="w-full max-w-4xl">
-        {showInput && (
-          <VinInputCard
-            onSubmit={(vin) => handleVinSubmit(vin, false)}
-            loading={loading}
-            onSampleClick={handleDecodeSample}
-            samples={SAMPLE_VINS}
-          />
-        )}
-
-        {error && (
-          <div className="bg-red-900/20 border border-red-500 rounded-lg p-6 text-center">
-            <p className="text-red-400 mb-4">{error}</p>
-            <button
-              onClick={handleDecodeAnother}
-              className="px-6 py-2 bg-neutral-800 text-white rounded hover:bg-neutral-700 transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {vehicleData && (
-          <VehicleResultsNew
-            data={vehicleData}
-            vin={currentVin}
-            onDecodeNext={handleDecodeNextSample}
-            onDecodeAnother={handleDecodeAnother}
-            isSample={isSample}
-          />
-        )}
-      </div>
+    <div className="flex min-h-screen items-start justify-center bg-[#1a1a1a] p-[clamp(12px,3vw,40px)] font-sans antialiased">
+      <IdentificationCard
+        vin={vin}
+        onVinChange={handleVinChange}
+        onDecode={() => handleDecode(vin, false)}
+        onClear={handleClear}
+        onNextSample={handleNextSample}
+        onSampleClick={handleSampleClick}
+        loading={loading}
+        error={error}
+        data={data}
+        isSample={isSample}
+        decodedAt={decodedAt}
+        history={history}
+        onHistoryLoad={handleHistoryLoad}
+        onHistoryRemove={handleHistoryRemove}
+      />
       <GoogleAnalytics gaId="G-L560QKP7ZF" />
     </div>
   )

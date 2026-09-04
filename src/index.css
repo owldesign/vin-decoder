@@ -106,6 +106,12 @@
     }
 
     body {
-        @apply bg-background text-foreground;
+        @apply bg-[#1a1a1a] text-foreground antialiased;
+        font-family: "Geist", system-ui, sans-serif;
     }
+}
+
+@keyframes vinScan {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
 }

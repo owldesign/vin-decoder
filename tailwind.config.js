@@ -47,6 +47,19 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        sans: ["Geist", "system-ui", "sans-serif"],
+        mono: ["Geist Mono", "ui-monospace", "monospace"],
+      },
+      keyframes: {
+        vinScan: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(400%)" },
+        },
+      },
+      animation: {
+        vinScan: "vinScan 1.1s cubic-bezier(.45,0,.55,1) infinite",
+      },
     },
   },
   plugins: [],
